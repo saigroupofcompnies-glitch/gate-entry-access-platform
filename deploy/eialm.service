@@ -1,0 +1,17 @@
+[Unit]
+Description=EIALM examination identity platform
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/eialm
+Environment=NODE_ENV=production
+Environment=HOST=0.0.0.0
+Environment=PORT=4170
+EnvironmentFile=-/opt/eialm/.env
+ExecStart=/usr/bin/node server/index.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,16 @@
+services:
+  eialm:
+    build: .
+    ports:
+      - "4170:4170"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4170
+      GATE_TOKEN_SECRET: ${GATE_TOKEN_SECRET:-change-this-to-a-long-random-string}
+    volumes:
+      - eialm-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  eialm-data:

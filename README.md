@@ -7,7 +7,7 @@ Multi-exam identity, OTR, centre duty enrolment and live monitoring platform.
 Requires Node.js 20+.
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/saigroupofcompnies-glitch/gate-entry-access-platform.git
 cd gate-entry-access-platform
 npm install
 npm run dev
@@ -50,6 +50,32 @@ server {
 ```
 
 SQLite file is created at `data/eialm.sqlite` (not in git). Keep that folder on persistent disk.
+
+## Docker
+
+```bash
+git clone https://github.com/saigroupofcompnies-glitch/gate-entry-access-platform.git
+cd gate-entry-access-platform
+export GATE_TOKEN_SECRET="long-random-secret"
+docker compose up -d --build
+```
+
+App: http://SERVER-IP:4170
+
+## systemd (Ubuntu / Debian VPS)
+
+```bash
+sudo git clone https://github.com/saigroupofcompnies-glitch/gate-entry-access-platform.git /opt/eialm
+cd /opt/eialm
+sudo npm install
+sudo cp deploy/eialm.service /etc/systemd/system/
+echo 'GATE_TOKEN_SECRET=long-random-secret' | sudo tee /opt/eialm/.env
+sudo systemctl daemon-reload
+sudo systemctl enable --now eialm
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/eialm
+sudo ln -sf /etc/nginx/sites-available/eialm /etc/nginx/sites-enabled/eialm
+sudo nginx -t && sudo systemctl reload nginx
+```
 
 ### Render / Railway / similar
 
