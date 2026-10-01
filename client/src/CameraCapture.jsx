@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
-export default function CameraCapture({ onCapture, label = "Capture face" }) {
+export default function CameraCapture({ onCapture, label = "Capture face", autoSnap = false, kiosk = false }) {
   const videoRef = useRef(null);
   const [err, setErr] = useState("");
   const [preview, setPreview] = useState("");
+  const snapped = useRef(false);
 
   useEffect(() => {
     let stream;
@@ -29,6 +30,16 @@ export default function CameraCapture({ onCapture, label = "Capture face" }) {
     onCapture(data);
   }
 
+  useEffect(() => {
+    if (!autoSnap || snapped.current) return undefined;
+    const t = setTimeout(() => {
+      if (snapped.current) return;
+      snapped.current = true;
+      snap();
+    }, 1600);
+    return () => clearTimeout(t);
+  }, [autoSnap]);
+
   function onFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -46,18 +57,20 @@ export default function CameraCapture({ onCapture, label = "Capture face" }) {
         {preview ? <img src={preview} alt="Captured" /> : <video ref={videoRef} autoPlay playsInline muted />}
       </div>
       {err && <p className="warn">{err}</p>}
-      <div className="row">
-        <button type="button" className="btn" onClick={snap}>{label}</button>
-        {preview && (
-          <button type="button" className="btn ghost" onClick={() => { setPreview(""); onCapture(""); }}>
-            Retake
-          </button>
-        )}
-        <label className="btn ghost file-lab">
-          Upload photo
-          <input type="file" accept="image/*" hidden onChange={onFile} />
-        </label>
-      </div>
+      {!kiosk && (
+        <div className="row">
+          <button type="button" className="btn" onClick={snap}>{label}</button>
+          {preview && (
+            <button type="button" className="btn ghost" onClick={() => { setPreview(""); snapped.current = false; onCapture(""); }}>
+              Retake
+            </button>
+          )}
+          <label className="btn ghost file-lab">
+            Upload photo
+            <input type="file" accept="image/*" hidden onChange={onFile} />
+          </label>
+        </div>
+      )}
     </div>
   );
 }

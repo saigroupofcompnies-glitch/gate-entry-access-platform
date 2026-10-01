@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { api, setSession } from "../api";
+import PublicChrome from "../PublicChrome.jsx";
 
 export default function DeviceLogin({ kind }) {
   const nav = useNavigate();
   const isCand = kind === "candidate";
-  const [username, setUsername] = useState(kind === "gate" ? "gate" : kind === "classroom" ? "classroom" : "");
-  const [password, setPassword] = useState("Pilot@123");
-  const [mobile, setMobile] = useState("9810000001");
-  const [otp, setOtp] = useState("123456");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [otp, setOtp] = useState("");
   const [err, setErr] = useState("");
 
   async function submit(e) {
@@ -35,31 +36,30 @@ export default function DeviceLogin({ kind }) {
     }
   }
 
+  const title = isCand ? "Candidate login" : kind === "gate" ? "Gate device" : "Classroom gate";
+  const banner = isCand ? "/exam/student-otr-register.jpg" : "/exam/hero-exam-centre.jpg";
+
   return (
-    <div className="login-wrap">
-      <div className="panel" style={{ width: "min(420px, 100%)" }}>
-        <p><Link to="/operations">← Operations index</Link></p>
-        <h2>{kind === "gate" ? "Gate device" : kind === "classroom" ? "Classroom device" : "Candidate"}</h2>
-        <form onSubmit={submit}>
-          {isCand ? (
-            <>
-              <label>Mobile</label>
-              <input value={mobile} onChange={(e) => setMobile(e.target.value)} />
-              <label>OTP</label>
-              <input value={otp} onChange={(e) => setOtp(e.target.value)} />
-            </>
-          ) : (
-            <>
-              <label>Username</label>
-              <input value={username} onChange={(e) => setUsername(e.target.value)} />
-              <label>Password</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-            </>
-          )}
-          {err && <p className="err">{err}</p>}
-          <button className="btn" type="submit" style={{ marginTop: 12 }}>Continue</button>
-        </form>
-      </div>
-    </div>
+    <PublicChrome banner={banner} title={title} subtitle="DigiSecureExam field and student access.">
+      <form className="panel dsx-panel" style={{ maxWidth: 440, margin: "0 auto" }} onSubmit={submit}>
+        {isCand ? (
+          <>
+            <label>Mobile</label>
+            <input value={mobile} onChange={(e) => setMobile(e.target.value)} />
+            <label>OTP</label>
+            <input value={otp} onChange={(e) => setOtp(e.target.value)} />
+          </>
+        ) : (
+          <>
+            <label>User ID</label>
+            <input value={username} onChange={(e) => setUsername(e.target.value)} />
+            <label>Password</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </>
+        )}
+        {err && <p className="err">{err}</p>}
+        <button className="btn" type="submit" style={{ marginTop: 12 }}>Continue</button>
+      </form>
+    </PublicChrome>
   );
 }

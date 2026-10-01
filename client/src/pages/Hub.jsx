@@ -62,7 +62,7 @@ export default function Hub() {
   return (
     <div className="login-wrap">
       <div style={{ width: "min(1080px, 100%)" }}>
-        <div className="kicker">EIALM · three separate portals</div>
+        <div className="kicker">Digisecurexam</div>
         <h1 style={{ marginTop: 6 }}>Choose where you work</h1>
         <p className="hint" style={{ color: "#cbb", maxWidth: 640 }}>
           Admin configures the platform. Centre Supervisor runs the venue. Client Control Room only watches live exam state.

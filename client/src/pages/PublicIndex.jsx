@@ -1,61 +1,131 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { api } from "../api";
+import { Logo } from "../PublicChrome.jsx";
 
 export default function PublicIndex() {
+  const [papers, setPapers] = useState([]);
+  useEffect(() => { api("/api/exams").then(setPapers).catch(() => setPapers([])); }, []);
+
   return (
-    <div className="gov-shell">
-      <div className="gov-tricolor" aria-hidden="true" />
-      <header className="gov-masthead">
-        <div className="gov-emblem">
-          <span>भारत</span>
-          <b>EIALM</b>
-        </div>
-        <div>
-          <p className="gov-dept">National Examination Identity &amp; Access Platform</p>
-          <p className="gov-sub">One-Time Registration · Centre Duty Enrolment · Live Centre Control</p>
+    <div className="dsx-landing">
+      <header className="dsx-nav">
+        <div className="dsx-nav-inner">
+          <Logo />
+          <nav>
+            <a href="#home">Home</a>
+            <a href="#about">About</a>
+            <a href="#guidelines">Guidelines</a>
+            <a href="#helpdesk">Helpdesk</a>
+            <a href="#contact">Contact</a>
+          </nav>
+          <Link className="dsx-admin" to="/login">Login</Link>
         </div>
       </header>
 
-      <main className="gov-main">
-        <p className="gov-kicker">Public registration desk</p>
-        <h1>Choose the correct desk. These are two different processes.</h1>
-        <p className="gov-lead">
-          Students complete reusable OTR identity. Centre personnel enrol for duty. Exam application and centre allotment are not done here.
-        </p>
-
-        <div className="gov-split">
-          <article className="lane-student">
-            <header>
-              <span className="lane-code">Desk A · Candidate</span>
-              <h2>Student OTR</h2>
-              <p>Identity enrolment as in a government examination form. Not an exam application.</p>
-            </header>
-            <ol>
-              <li>Basic particulars and live photograph</li>
-              <li>Family, blood group, address, identity numbers</li>
-              <li>Legal documents and ten fingerprints</li>
-            </ol>
-            <Link className="lane-cta" to="/otr">Open student OTR form</Link>
-          </article>
-
-          <article className="lane-staff">
-            <header>
-              <span className="lane-code">Desk B · Venue</span>
-              <h2>Centre staff &amp; incharge</h2>
-              <p>Duty enrolment for invigilators, operators and Centre Incharge. Separate from student OTR.</p>
-            </header>
-            <ul>
-              <li>Personal, identity and service particulars</li>
-              <li>Staff wait for Centre Incharge approval</li>
-              <li>Incharge waits for Main Admin approval</li>
-            </ul>
-            <Link className="lane-cta inverse" to="/staff-register">Open duty enrolment form</Link>
-          </article>
+      <section className="dsx-hero" id="home">
+        <div className="dsx-hero-copy">
+          <h1>Secure. Simple. <span>Seamless.</span></h1>
+          <p>A unified platform for examination registration, verification and centre management.</p>
+          <div className="dsx-pills">
+            <span>Secure Registration</span>
+            <span>Verified Candidates</span>
+            <span>Transparent Process</span>
+            <span>Trusted by Institutions</span>
+          </div>
         </div>
-      </main>
+        <div className="dsx-hero-photo">
+          <img src="/exam/hero-airport-boarding.jpg" alt="Students at exam security with boarding passes" />
+          <div className="dsx-shield" aria-hidden="true">
+            <svg viewBox="0 0 64 64" width="88" height="88">
+              <path fill="#7ec8ff" opacity=".35" d="M32 6l22 8v16c0 14-10 26-22 30C20 56 10 44 10 30V14l22-8z" />
+              <path fill="none" stroke="#fff" strokeWidth="3" d="M32 8l20 7.4v15c0 13-9 24-20 28-11-4-20-15-20-28v-15L32 8z" />
+              <rect x="26" y="26" width="12" height="14" rx="2" fill="none" stroke="#fff" strokeWidth="2.5" />
+              <path fill="none" stroke="#fff" strokeWidth="2.5" d="M29 26v-3a3 3 0 016 0v3" />
+            </svg>
+          </div>
+        </div>
+      </section>
 
-      <footer className="gov-foot">
-        <span>Authorised operations (Incharge / Client / Admin)</span>
-        <Link to="/operations">Enter operations login</Link>
+      <section className="dsx-desks">
+        <article className="dsx-card student">
+          <img src="/exam/student-otr-register.jpg" alt="Student completing exam registration on a laptop" />
+          <div>
+            <h2>Student OTR</h2>
+            <p>Register once. Use it for every exam.</p>
+            <ul>
+              <li>One Time Registration (OTR)</li>
+              <li>Create &amp; manage profile</li>
+              <li>Use for all exams</li>
+              <li>Secure &amp; verified identity</li>
+            </ul>
+            <Link className="dsx-cta blue" to="/otr">Register →</Link>
+          </div>
+        </article>
+        <article className="dsx-card staff">
+          <div>
+            <h2>Centre Staff</h2>
+            <p>Staff and centre incharge registration.</p>
+            <ul>
+              <li>Staff registration</li>
+              <li>Centre incharge access</li>
+              <li>Manage exam day activities</li>
+              <li>Secure login &amp; role based access</li>
+            </ul>
+            <Link className="dsx-cta orange" to="/staff-register">Register →</Link>
+          </div>
+          <img src="/exam/staff-centre-desk.jpg" alt="Centre staff working at the examination desk" />
+        </article>
+      </section>
+
+      <section className="dsx-strip">
+        <div><b>Single registration</b> for all exams</div>
+        <div><b>Secure &amp; verified</b> process</div>
+        <div><b>Real-time</b> monitoring</div>
+        <div><b>Centre</b> management</div>
+        <div><b>Dedicated</b> helpdesk</div>
+      </section>
+
+      {papers.length > 0 && (
+        <section className="dsx-open">
+          <h3>Open examinations</h3>
+          <ul>
+            {papers.map((p) => (
+              <li key={p.id}>
+                <Link to={`/digi-exam/${p.slug}`}>{p.name}</Link>
+                <span>{p.exam_date}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="dsx-info" id="about">
+        <h3>About</h3>
+        <p>DigiSecureExam is a digital examination identity and centre-access platform. Students complete OTR once. Centres verify face and fingerprint on exam day.</p>
+      </section>
+      <section className="dsx-info" id="guidelines">
+        <h3>Guidelines</h3>
+        <p>Complete OTR with photograph, documents and 10 fingerprints. Apply during the registration window. Collect the boarding pass when issued. Carry it to the centre gate.</p>
+      </section>
+      <section className="dsx-info" id="helpdesk">
+        <h3>Helpdesk</h3>
+        <p>For OTR or boarding-pass help, use the registered mobile on the student desk. Centre staff issues are handled by the centre incharge.</p>
+      </section>
+      <section className="dsx-info" id="contact">
+        <h3>Contact</h3>
+        <p>Students, staff, centre incharge and admin all use <a href="/login">Login</a>.</p>
+      </section>
+
+      <footer className="dsx-foot">
+        <Logo light />
+        <p>
+          <a href="#about">Privacy Policy</a>
+          <a href="#guidelines">Terms &amp; Conditions</a>
+          <a href="#helpdesk">Helpdesk</a>
+          <a href="#contact">Contact Us</a>
+        </p>
+        <small>A digital examination management platform for a secure and transparent process.</small>
       </footer>
     </div>
   );

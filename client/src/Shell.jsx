@@ -34,8 +34,8 @@ export default function Shell({ children }) {
   return (
     <div className="shell">
       <aside className="nav">
-        <div className="kicker">EIALM</div>
-        <p style={{ margin: "8px 0 18px", fontWeight: 700 }}>Gate Entry Access</p>
+        <div className="kicker">Digisecurexam</div>
+        <p style={{ margin: "8px 0 18px", fontWeight: 700 }}>Digisecurexam</p>
         {links.map(([to, label]) => (
           <NavLink key={to} to={to} className={({ isActive }) => (isActive ? "active" : "")}>
             {label}

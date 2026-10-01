@@ -1,113 +1,90 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, setSession } from "../api";
+import PublicChrome from "../PublicChrome.jsx";
+import { homeForRole } from "../homeForRole.js";
 
-const PORTALS = [
-  {
-    id: "supervisor",
-    code: "01",
-    title: "Centre Incharge",
-    text: "Approve duty staff and monitor this venue only.",
-    user: "supervisor",
-    dest: "/centre",
-    roles: ["CENTRE_HEAD"],
-  },
-  {
-    id: "client",
-    code: "02",
-    title: "Client control room",
-    text: "Read-only view of all centres, classrooms and exceptions.",
-    user: "client",
-    dest: "/control-room",
-    roles: ["CLIENT", "DEPARTMENT_OFFICER"],
-  },
-  {
-    id: "admin",
-    code: "03",
-    title: "Main Admin",
-    text: "Exams, DIGITAL-EXAM pages, users, import and export.",
-    user: "admin",
-    dest: "/admin",
-    roles: ["SUPER_ADMIN"],
-  },
+const DESKS = [
+  { id: "student", title: "Student", text: "Mobile and OTP after OTR." },
+  { id: "staff", title: "Staff", text: "Duty login. Download ID card and gate pass." },
+  { id: "incharge", title: "Centre Incharge", text: "Venue staff and presence." },
+  { id: "client", title: "Control room", text: "Live view across centres." },
+  { id: "admin", title: "Admin", text: "Exams, boarding passes and users." },
 ];
 
 export default function OperationsHub() {
   const nav = useNavigate();
-  const [portal, setPortal] = useState("admin");
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("Pilot@123");
+  const [desk, setDesk] = useState("student");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [otp, setOtp] = useState("");
   const [err, setErr] = useState("");
-  const spec = PORTALS.find((p) => p.id === portal);
-
-  function pick(p) {
-    setPortal(p.id);
-    setUsername(p.user);
-    setErr("");
-  }
+  const spec = DESKS.find((d) => d.id === desk);
+  const isStudent = desk === "student";
 
   async function submit(e) {
     e.preventDefault();
     setErr("");
     try {
-      const data = await api("/api/auth/login", { method: "POST", body: { username, password } });
-      if (!spec.roles.includes(data.user.role)) {
-        setErr(`This account is ${data.user.role}. Use the matching desk.`);
+      if (isStudent) {
+        const data = await api("/api/auth/candidate-otp", { method: "POST", body: { mobile, otp } });
+        setSession(data.token, data.user);
+        nav("/candidate");
         return;
       }
+      const data = await api("/api/auth/login", { method: "POST", body: { username, password } });
       setSession(data.token, data.user);
-      nav(spec.dest);
+      nav(homeForRole(data.user.role));
     } catch (e2) {
-      setErr(e2.message);
+      const map = {
+        CANDIDATE_NOT_FOUND: "No OTR found for this mobile. Register first.",
+        INVALID_OTP: "OTP is incorrect.",
+        INVALID_CREDENTIALS: "User ID or password is incorrect.",
+      };
+      setErr(map[e2.message] || e2.message);
     }
   }
 
   return (
-    <div className="gov-shell">
-      <div className="gov-tricolor" />
-      <header className="gov-masthead">
-        <div className="gov-emblem"><b>EIALM</b></div>
-        <div>
-          <p className="gov-dept">Operations access</p>
-          <p className="gov-sub">Restricted · Incharge · Client · Main Admin</p>
-        </div>
-      </header>
-      <main className="gov-main">
-        <p><Link to="/">← Public registration desk</Link></p>
-        <h1>Select your authorised desk</h1>
-        <div className="ops-rows">
-          {PORTALS.map((p) => (
-            <button key={p.id} type="button" className={`ops-row ${portal === p.id ? "on" : ""}`} onClick={() => pick(p)}>
-              <span className="ops-code">{p.code}</span>
-              <span>
-                <strong>{p.title}</strong>
-                <em>{p.text}</em>
-              </span>
-              <span className="mono">{p.user}</span>
-            </button>
-          ))}
-        </div>
-        <div className="panel">
-          <form onSubmit={submit}>
-            <h3>{spec.title} login</h3>
-            <div className="form-grid">
-              <div>
-                <label>Username</label>
-                <input value={username} onChange={(e) => setUsername(e.target.value)} />
-              </div>
-              <div>
-                <label>Password</label>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-              </div>
-            </div>
-            {err && <p className="err">{err}</p>}
-            <button className="btn" type="submit" style={{ marginTop: 14 }}>Sign in</button>
-          </form>
-        </div>
-        <p className="hint" style={{ marginTop: 16 }}>
-          Field devices: <Link to="/login/gate">Gate</Link> · <Link to="/login/classroom">Classroom</Link>
-        </p>
-      </main>
-    </div>
+    <PublicChrome
+      page="login"
+      banner="/exam/face-match-kiosk.jpg"
+      title="Login"
+      subtitle="Student, staff, centre incharge, control room and admin — one sign-in."
+    >
+      <div className="dsx-login-picks">
+        {DESKS.map((d) => (
+          <button key={d.id} type="button" className={`dsx-pick ${desk === d.id ? "on" : ""}`} onClick={() => { setDesk(d.id); setErr(""); }}>
+            <strong>{d.title}</strong>
+            <span>{d.text}</span>
+          </button>
+        ))}
+      </div>
+      <form className="panel dsx-panel" style={{ maxWidth: 480, margin: "18px auto" }} onSubmit={submit}>
+        <h3>{spec.title}</h3>
+        {isStudent ? (
+          <>
+            <label>Registered mobile</label>
+            <input value={mobile} onChange={(e) => setMobile(e.target.value)} required />
+            <label>OTP</label>
+            <input value={otp} onChange={(e) => setOtp(e.target.value)} required />
+            <p className="hint">New student? <Link to="/otr">Create OTR</Link></p>
+          </>
+        ) : (
+          <>
+            <label>User ID</label>
+            <input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+            <label>Password</label>
+            <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            {desk === "staff" && (
+              <p className="hint">New staff? <Link to="/staff-register">Register for duty</Link></p>
+            )}
+          </>
+        )}
+        {err && <p className="err">{err}</p>}
+        <button className="btn" type="submit" style={{ marginTop: 14 }}>Sign in</button>
+      </form>
+    </PublicChrome>
   );
 }

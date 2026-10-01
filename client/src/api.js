@@ -1,5 +1,5 @@
-const TOKEN_KEY = "eialm_token";
-const USER_KEY = "eialm_user";
+const TOKEN_KEY = "digi_exam_token";
+const USER_KEY = "digi_exam_user";
 
 export function getToken() {
   return sessionStorage.getItem(TOKEN_KEY);

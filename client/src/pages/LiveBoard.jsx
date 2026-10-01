@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { matchAdminFilters, useAdminFilters } from "../AdminFilters.jsx";
 
 export default function LiveBoard({ mode }) {
+  const adminF = useAdminFilters();
   const [exams, setExams] = useState([]);
   const [examId, setExamId] = useState("");
   const [ov, setOv] = useState(null);
@@ -11,9 +13,13 @@ export default function LiveBoard({ mode }) {
   const client = mode === "client";
 
   useEffect(() => {
+    if (adminF.filters?.examId) setExamId(adminF.filters.examId);
+  }, [adminF.filters?.examId]);
+
+  useEffect(() => {
     api("/api/live/exams").then((rows) => {
       setExams(rows);
-      if (rows[0] && !examId) setExamId(rows[0].id);
+      if (rows[0] && !examId && !adminF.filters?.examId) setExamId(rows[0].id);
     }).catch(() => {});
   }, []);
 
@@ -32,7 +38,7 @@ export default function LiveBoard({ mode }) {
   useEffect(() => {
     if (!examId && exams.length === 0) return;
     refresh(examId);
-    const timer = setInterval(() => refresh(examId), 8000);
+    const timer = setInterval(() => refresh(examId), 3000);
     return () => clearInterval(timer);
   }, [examId]);
 
@@ -42,8 +48,8 @@ export default function LiveBoard({ mode }) {
     <div className={client ? "control-room" : ""}>
       <div className="topbar">
         <div>
-          <div className="kicker">{client ? "Client Control Room · all centres" : "Centre Incharge · this venue"}</div>
-          <h2 style={{ margin: 0 }}>{ov.examName} · {ov.centreName}</h2>
+          <div className="kicker">{client ? "All centres" : "This venue"}</div>
+          <h2 style={{ margin: 0 }}>{ov.examName} · {ov.examMode || "OFFLINE"} · {ov.centreName}</h2>
         </div>
         <div>
           <label className="hint">Exam</label>
@@ -52,7 +58,7 @@ export default function LiveBoard({ mode }) {
               <option key={ex.id} value={ex.id}>{ex.slug || ex.code} · {ex.name} ({ex.lifecycle})</option>
             ))}
           </select>
-          <div className="hint">{client ? "Full exam: centres, classrooms, students" : "Staff approval is on the Staff tab"} · {new Date(ov.generatedAt).toLocaleTimeString()}</div>
+          <div className="hint">{client ? "Full exam: centres, classrooms, students" : "Staff approval is on the Staff tab"} · auto 3s · {new Date(ov.generatedAt).toLocaleTimeString()}</div>
         </div>
       </div>
       <div className="cards">
@@ -60,33 +66,49 @@ export default function LiveBoard({ mode }) {
         <div className="metric"><span>Centre entered</span><b>{ov.centreEntered}</b></div>
         <div className="metric"><span>Not yet in lab</span><b>{ov.centreEnteredOnly}</b></div>
         <div className="metric"><span>Classroom present</span><b>{ov.classroomPresent}</b></div>
+        <div className="metric"><span>Fingerprint at centre</span><b>{ov.fingerprintMatched ?? 0}</b></div>
         <div className="metric"><span>Denied</span><b>{ov.denied}</b></div>
         <div className="metric"><span>Open alerts</span><b>{ov.openAlerts}</b></div>
       </div>
       <div className="panel">
-        <h3>Classrooms / labs</h3>
+        <h3>Classroom gates (one device per room)</h3>
         <table>
-          <thead><tr><th>Lab</th><th>Building</th><th>Present</th><th>Capacity</th><th>%</th></tr></thead>
+          <thead><tr><th>Lab</th><th>Device</th><th>Present</th><th>Capacity</th><th>%</th><th>Last update</th></tr></thead>
           <tbody>
             {labs.map((l) => (
               <tr key={l.id}>
                 <td className="mono">{l.id} {l.name}</td>
-                <td>{l.building} / {l.floor}</td>
+                <td>{l.deviceId || "—"} <span className={`pill ${l.deviceStatus === "ONLINE" ? "ok" : "warnp"}`}>{l.deviceStatus}</span></td>
                 <td>{l.present}</td>
                 <td>{l.capacity}</td>
                 <td>{l.occupancy}%</td>
+                <td className="hint">{l.lastPresentAt || l.lastSync || "—"}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {ov.lastClassroom?.length > 0 && (
+        <div className="panel">
+          <h3>Latest classroom face checks</h3>
+          {ov.lastClassroom.map((ev, i) => (
+            <div key={i} className="row" style={{ marginBottom: 6 }}>
+              <span className="pill ok">PRESENT</span>
+              <span>{ev.full_name} · {ev.otr_id}</span>
+              <span>{ev.lab_name || ev.lab_id}</span>
+              {ov.examMode === "CBT" && <span className="mono">{ev.seat_no || "—"}</span>}
+              <span className="hint">{ev.created_at}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {mode === "students" || mode === "client" ? (
         <div className="panel">
           <h3>Students — centre entry is not classroom presence</h3>
           <table>
-            <thead><tr><th>OTR</th><th>Name</th><th>State</th><th>Lab</th></tr></thead>
+            <thead><tr><th>OTR</th><th>Name</th><th>State</th><th>Lab</th>{ov.examMode === "CBT" ? <th>Seat</th> : null}<th>Classroom at</th></tr></thead>
             <tbody>
-              {students.map((s) => (
+              {students.filter((s) => matchAdminFilters(s, adminF.filters || {})).map((s) => (
                 <tr key={s.id}>
                   <td className="mono">{s.otr_id}</td>
                   <td>{s.full_name}</td>
@@ -95,7 +117,9 @@ export default function LiveBoard({ mode }) {
                       {s.presence.state}
                     </span>
                   </td>
-                  <td>{s.presence.room?.lab_id || "—"}</td>
+                  <td>{s.lab_name || s.presence.room?.lab_id || "—"}</td>
+                  {ov.examMode === "CBT" ? <td className="mono">{s.seat_no || "—"}</td> : null}
+                  <td className="hint">{s.classroom_at || "—"}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 
 function secret() {
-  return process.env.GATE_TOKEN_SECRET || "eialm-pilot-hmac-change-me";
+  return process.env.GATE_TOKEN_SECRET || "digi-exam-hmac-change-me";
 }
 
 function signPayload(obj) {

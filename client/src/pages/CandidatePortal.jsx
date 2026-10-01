@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import CameraCapture from "../CameraCapture.jsx";
 import FileSlot from "../FileSlot.jsx";
+import PublicChrome from "../PublicChrome.jsx";
 import { api } from "../api";
 
 const FINGERS = [
@@ -53,14 +54,63 @@ const emptyProfile = {
   permAddress: "",
 };
 
+function OtrDone({ otrId, mobile, otp, setOtp }) {
+  const [exams, setExams] = useState([]);
+  const [apps, setApps] = useState([]);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    api("/api/exams").then(setExams).catch(() => {});
+  }, []);
+
+  async function apply(exam) {
+    setErr("");
+    setMsg("");
+    try {
+      const out = await api(`/api/exams/${exam.id}/apply-public`, { method: "POST", body: { mobile, otp } });
+      setMsg(out.message || `Applied to ${exam.slug}. Centre comes on the admit card.`);
+      setApps((a) => [...a, { slug: exam.slug, status: out.status }]);
+    } catch (e2) {
+      setErr(e2.message);
+    }
+  }
+
+  return (
+    <div>
+      <p>OTR <b className="mono">{otrId}</b> is complete. You do not choose a centre.</p>
+      <h3>Open exam applications</h3>
+      {!exams.length && <p className="hint">No paper is in the registration window right now.</p>}
+      {exams.map((ex) => (
+        <div key={ex.id} className="row" style={{ marginBottom: 8 }}>
+          <span>{ex.name} · {ex.exam_date}</span>
+          <Link className="btn ghost" to={`/digi-exam/${ex.slug}`}>Open form</Link>
+          <button className="btn" type="button" onClick={() => apply(ex)}>Apply now</button>
+        </div>
+      ))}
+      <div className="form-grid" style={{ marginTop: 12 }}>
+        <div>
+          <label>OTP (needed to apply)</label>
+          <input value={otp} onChange={(e) => setOtp(e.target.value)} />
+        </div>
+      </div>
+      {msg && <p className="hint">{msg}</p>}
+      {err && <p className="err">{err}</p>}
+      {apps.map((a, i) => <p key={i} className="hint">{a.slug}: {a.status}</p>)}
+      <p><Link className="btn ghost" to="/">Public index</Link></p>
+    </div>
+  );
+}
+
 export default function CandidatePortal() {
+  const loc = useLocation();
   const [step, setStep] = useState("basic");
   const [basic, setBasic] = useState({
     fullName: "", mobile: "", email: "", dob: "", gender: "M", consent: true,
   });
   const [photo, setPhoto] = useState("");
   const [otrId, setOtrId] = useState("");
-  const [otp, setOtp] = useState("123456");
+  const [otp, setOtp] = useState("");
   const [profile, setProfile] = useState(emptyProfile);
   const [docs, setDocs] = useState({});
   const [fingers, setFingers] = useState({});
@@ -81,6 +131,10 @@ export default function CandidatePortal() {
   async function activate(e) {
     e.preventDefault();
     setErr("");
+    if (!photo) {
+      setErr("Capture live photograph.");
+      return;
+    }
     try {
       const data = await api("/api/candidates/register", {
         method: "POST",
@@ -147,11 +201,9 @@ export default function CandidatePortal() {
     }
   }
 
-  return (
-    <div className="login-wrap" style={{ alignItems: "start" }}>
-      <div className="panel otr-wide">
-        <p><Link to="/">← Public index</Link></p>
-        <div className="kicker">Student OTR</div>
+  const inner = (
+      <div className="panel otr-wide dsx-panel">
+        <div className="kicker">Identity Vault</div>
         <h2>One-Time Registration</h2>
         <p className="hint">OTR is identity only. Exam application will open later. Centre is never chosen by the student.</p>
         <div className="otr-steps">
@@ -174,7 +226,7 @@ export default function CandidatePortal() {
                 </div>
                 <div>
                   <label>Email</label>
-                  <input type="email" value={basic.email} onChange={(e) => setBasic({ ...basic, email: e.target.value })} />
+                  <input type="email" value={basic.email} onChange={(e) => setBasic({ ...basic, email: e.target.value })} required />
                 </div>
                 <div>
                   <label>Date of birth</label>
@@ -378,13 +430,18 @@ export default function CandidatePortal() {
         )}
 
         {step === "done" && (
-          <div>
-            <p>OTR <b className="mono">{otrId}</b> is complete.</p>
-            <p>Identity, documents and 10 fingerprints are stored. You will choose an exam on a later registration page. You do not select a centre.</p>
-            <Link className="btn" to="/">Back to public index</Link>
-          </div>
+          <OtrDone otrId={otrId} mobile={basic.mobile} otp={otp} setOtp={setOtp} />
         )}
       </div>
-    </div>
+  );
+  if (loc.pathname.startsWith("/candidate")) return inner;
+  return (
+    <PublicChrome
+      banner="/exam/student-otr-register.jpg"
+      title="Student OTR"
+      subtitle="Register once. Use the same identity for every exam."
+    >
+      {inner}
+    </PublicChrome>
   );
 }

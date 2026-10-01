@@ -49,7 +49,7 @@ export default function Login() {
     <div className="login-wrap">
       <div className="login-card">
         <div className="login-brand">
-          <div className="kicker">SRS v1.0 · Pilot</div>
+          <div className="kicker">Digisecurexam</div>
           <h1>Examination Identity, Access & Live Centre Management</h1>
           <p>Register identity once. Examination boarding pass is a time-bound transaction. Centre entry is not classroom presence.</p>
           <p className="hint" style={{ color: "#cbb" }}>

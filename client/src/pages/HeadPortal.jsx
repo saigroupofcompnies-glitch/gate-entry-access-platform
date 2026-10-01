@@ -17,10 +17,14 @@ export default function HeadPortal() {
 
   async function decide(id, decision) {
     const comments = window.prompt("Comments") || "";
-    await api(`/api/staff/${id}/approve`, { method: "POST", body: { decision, comments } });
+    const out = await api(`/api/staff/${id}/approve`, { method: "POST", body: { decision, comments } });
     if (decision === "APPROVE") {
       await api(`/api/staff/${id}/assign`, { method: "POST", body: { examId, role: "INVIGILATOR", labId: "LAB-01" } });
-      setMsg("Approved and assigned to the selected exam / LAB-01.");
+      if (out.login) {
+        setMsg(`Approved. Staff login: ${out.login.username}${out.login.password ? ` / ${out.login.password}` : ""}. They sign in to download ID card and gate pass.`);
+      } else {
+        setMsg("Approved and assigned. Staff can sign in to download ID card and gate pass.");
+      }
     }
     load();
   }
@@ -29,7 +33,7 @@ export default function HeadPortal() {
     <div>
       <div className="topbar">
         <div>
-          <div className="kicker">Centre Incharge · staff</div>
+          <div className="kicker">Staff approval</div>
           <h2 style={{ margin: 0 }}>Approve duty staff for this centre</h2>
         </div>
         <div>

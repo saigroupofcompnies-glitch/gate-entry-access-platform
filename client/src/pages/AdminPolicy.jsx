@@ -19,8 +19,9 @@ export default function AdminPolicy() {
   }
   return (
     <div>
-      <div className="kicker">Main Admin</div>
-      <h2>Security policy</h2>
+      <div className="kicker">System Configuration</div>
+      <h2>System Configuration</h2>
+      <p className="hint">Face thresholds used at gate and classroom. Allocation rules are per exam on Allocation Engine.</p>
       <div className="panel">
         <form onSubmit={save}>
           <label>Face pass threshold</label>

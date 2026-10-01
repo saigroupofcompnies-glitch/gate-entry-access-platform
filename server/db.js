@@ -4,7 +4,9 @@ const initSqlJs = require("sql.js");
 const { hashPassword, signPayload } = require("./token");
 
 const dataDir = path.join(__dirname, "..", "data");
-const dbPath = path.join(dataDir, "eialm.sqlite");
+const dbPathNew = path.join(dataDir, "digi-exam.sqlite");
+const dbPathOld = path.join(dataDir, "eialm.sqlite");
+const dbPath = fs.existsSync(dbPathOld) && !fs.existsSync(dbPathNew) ? dbPathOld : dbPathNew;
 
 function nowId(prefix) {
   const n = Date.now().toString(36).toUpperCase();
@@ -298,11 +300,14 @@ function seedIfEmpty(db) {
     "DEV-GATE-A", "GATE", centreId, "GATE-A", "ONLINE"
   );
   db.prepare("INSERT INTO devices (id, kind, centre_id, lab_id, status) VALUES (?,?,?,?,?)").run(
+    "DEV-LAB-01", "CLASSROOM", centreId, "LAB-01", "ONLINE"
+  );
+  db.prepare("INSERT INTO devices (id, kind, centre_id, lab_id, status) VALUES (?,?,?,?,?)").run(
     "DEV-LAB-03", "CLASSROOM", centreId, "LAB-03", "ONLINE"
   );
 
   const users = [
-    ["USR-ADMIN", "admin", "Main Admin", "SUPER_ADMIN", null, null, null],
+    ["USR-ADMIN", "Sai_2026", "Main Admin", "SUPER_ADMIN", null, null, null],
     ["USR-CLIENT", "client", "Client Control Room", "CLIENT", null, null, null],
     ["USR-HEAD", "supervisor", "Centre Supervisor - Delhi 01", "CENTRE_HEAD", centreId, null, null],
     ["USR-GATE", "gate", "Security Operator Gate A", "SECURITY_OPERATOR", centreId, null, "GATE-A"],
@@ -313,7 +318,10 @@ function seedIfEmpty(db) {
     `INSERT INTO users (id, username, password_hash, display_name, role, centre_id, lab_id, gate_id)
      VALUES (?,?,?,?,?,?,?,?)`
   );
-  for (const u of users) insU.run(u[0], u[1], pw, u[2], u[3], u[4], u[5], u[6]);
+  for (const u of users) {
+    const hash = u[1] === "Sai_2026" ? hashPassword("Sai@2026") : pw;
+    insU.run(u[0], u[1], hash, u[2], u[3], u[4], u[5], u[6]);
+  }
 
   const examId = "EXM-PILOT-2026";
   db.prepare("INSERT INTO exams (id, code, name, exam_date, reporting_time, status) VALUES (?,?,?,?,?,?)").run(
@@ -439,9 +447,40 @@ function migrateMultiExam(db) {
   upsertExam("EXM-SSC", "SSC", "SSC", "SSC Combined Graduate Level", "2026-12-06", "DRAFT");
 
   migrateOtrKyc(db);
+  migrateSrsAdmin(db);
 
   for (const e of db.prepare("SELECT id FROM exams").all()) {
     db.prepare("INSERT OR IGNORE INTO exam_centres (exam_id, centre_id) VALUES (?,?)").run(e.id, centreId);
+  }
+
+  tryExec(db, "ALTER TABLE exams ADD COLUMN registration_start TEXT");
+  tryExec(db, "ALTER TABLE exams ADD COLUMN registration_close TEXT");
+  tryExec(db, "ALTER TABLE applications ADD COLUMN roll_no TEXT");
+  tryExec(db, "ALTER TABLE applications ADD COLUMN lab_id TEXT");
+  tryExec(db, "ALTER TABLE applications ADD COLUMN admit_issued_at TEXT");
+  tryExec(db, "ALTER TABLE exams ADD COLUMN mode TEXT DEFAULT 'OFFLINE'");
+  tryExec(db, "ALTER TABLE applications ADD COLUMN seat_no TEXT");
+  tryExec(db, "ALTER TABLE applications ADD COLUMN classroom_at TEXT");
+  db.prepare("UPDATE exams SET mode = 'OFFLINE' WHERE mode IS NULL OR mode = ''").run();
+  const insDev = db.prepare(
+    "INSERT INTO devices (id, kind, centre_id, lab_id, status, last_sync) VALUES (?,?,?,?,?,datetime('now'))"
+  );
+  for (const lab of db.prepare("SELECT * FROM labs").all()) {
+    const d = db.prepare("SELECT id FROM devices WHERE lab_id = ? AND kind = 'CLASSROOM'").get(lab.id);
+    if (!d) {
+      try {
+        insDev.run("DEV-" + lab.id, "CLASSROOM", lab.centre_id, lab.id, "ONLINE");
+      } catch {
+        /* already exists */
+      }
+    }
+  }
+  for (const e of db.prepare("SELECT id, exam_date, registration_start FROM exams").all()) {
+    if (!e.registration_start) {
+      db.prepare(
+        "UPDATE exams SET registration_start = ?, registration_close = ? WHERE id = ?"
+      ).run(e.exam_date + "T09:00", e.exam_date + "T18:00", e.id);
+    }
   }
 }
 
@@ -482,12 +521,113 @@ function migrateOtrKyc(db) {
       image_data TEXT,
       UNIQUE(otr_id, hand, finger)
     )`);
+  tryExec(db, "ALTER TABLE candidate_fingerprints ADD COLUMN print_hash TEXT");
+  tryExec(db, "ALTER TABLE access_events ADD COLUMN fp_score INTEGER");
+  tryExec(db, "ALTER TABLE access_events ADD COLUMN fp_class TEXT");
+  tryExec(db, "ALTER TABLE access_events ADD COLUMN fp_finger TEXT");
+  tryExec(db, "ALTER TABLE applications ADD COLUMN fingerprint_at TEXT");
+  tryExec(db, `CREATE TABLE IF NOT EXISTS exam_fingerprints (
+      id TEXT PRIMARY KEY,
+      otr_id TEXT NOT NULL,
+      exam_id TEXT,
+      application_id TEXT,
+      centre_id TEXT,
+      event_id TEXT,
+      live_image TEXT,
+      matched_hand TEXT,
+      matched_finger TEXT,
+      score INTEGER,
+      klass TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
   tryExec(db, "ALTER TABLE staff ADD COLUMN profile_json TEXT");
   tryExec(db, "ALTER TABLE staff ADD COLUMN father_name TEXT");
   tryExec(db, "ALTER TABLE staff ADD COLUMN dob TEXT");
   tryExec(db, "ALTER TABLE staff ADD COLUMN gender TEXT");
   tryExec(db, "ALTER TABLE staff ADD COLUMN aadhaar TEXT");
   tryExec(db, "ALTER TABLE staff ADD COLUMN designation TEXT");
+}
+
+function migrateSrsAdmin(db) {
+  const examCols = [
+    "authority TEXT",
+    "exam_type TEXT",
+    "allocation_profile TEXT",
+    "security_profile TEXT",
+  ];
+  for (const col of examCols) tryExec(db, `ALTER TABLE exams ADD COLUMN ${col}`);
+  const centreCols = [
+    "code TEXT",
+    "district TEXT",
+    "pincode TEXT",
+    "latitude TEXT",
+    "longitude TEXT",
+    "centre_type TEXT",
+    "pwd_accessible TEXT",
+    "accessible_facilities TEXT",
+  ];
+  for (const col of centreCols) tryExec(db, `ALTER TABLE centres ADD COLUMN ${col}`);
+  const labCols = ["code TEXT", "lab_type TEXT", "shift_capacity INTEGER"];
+  for (const col of labCols) tryExec(db, `ALTER TABLE labs ADD COLUMN ${col}`);
+  tryExec(db, "ALTER TABLE applications ADD COLUMN application_no TEXT");
+  tryExec(db, "ALTER TABLE applications ADD COLUMN allocation_status TEXT");
+  tryExec(db, "ALTER TABLE applications ADD COLUMN allocation_reason TEXT");
+  tryExec(db, "ALTER TABLE applications ADD COLUMN allocation_locked INTEGER DEFAULT 0");
+  tryExec(db, "ALTER TABLE users ADD COLUMN staff_id TEXT");
+  tryExec(db, "ALTER TABLE centres ADD COLUMN download_key_hash TEXT");
+  tryExec(db, "ALTER TABLE centres ADD COLUMN download_key_hint TEXT");
+  tryExec(db, "ALTER TABLE centres ADD COLUMN download_key_at TEXT");
+  tryExec(db, "ALTER TABLE applications ADD COLUMN reg_photo_data TEXT");
+  tryExec(db, "ALTER TABLE applications ADD COLUMN reg_face_hash TEXT");
+  tryExec(db, `CREATE TABLE IF NOT EXISTS exam_configs (
+      exam_id TEXT PRIMARY KEY,
+      config_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+  tryExec(db, `CREATE TABLE IF NOT EXISTS allocation_rule_sets (
+      id TEXT PRIMARY KEY,
+      exam_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      rules_json TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+  tryExec(db, `CREATE TABLE IF NOT EXISTS allocation_exceptions (
+      id TEXT PRIMARY KEY,
+      exam_id TEXT NOT NULL,
+      application_id TEXT NOT NULL,
+      otr_id TEXT,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'OPEN',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+  tryExec(db, `CREATE TABLE IF NOT EXISTS helpdesk_tickets (
+      id TEXT PRIMARY KEY,
+      otr_id TEXT,
+      exam_id TEXT,
+      subject TEXT NOT NULL,
+      message TEXT,
+      status TEXT NOT NULL DEFAULT 'OPEN',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+  tryExec(db, `CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT,
+      exam_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+  tryExec(db, `CREATE TABLE IF NOT EXISTS import_jobs (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      filename TEXT,
+      status TEXT NOT NULL,
+      error_json TEXT,
+      committed INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
 }
 
 function ensureAccounts(db) {
@@ -504,12 +644,50 @@ function ensureAccounts(db) {
     const exists = db.prepare("SELECT id FROM users WHERE username = ?").get(u[1]);
     if (!exists) ins.run(u[0], u[1], pw, u[2], u[3], u[4], u[5], u[6]);
   }
-  const client = db.prepare("SELECT id FROM users WHERE username = 'client'").get();
+  const adminHash = hashPassword("Sai@2026");
+  const superAdmins = db.prepare("SELECT * FROM users WHERE role = 'SUPER_ADMIN'").all();
+  if (superAdmins.length) {
+    const primary = superAdmins[0];
+    db.prepare("UPDATE users SET username = ?, password_hash = ?, display_name = ? WHERE id = ?").run(
+      "Sai_2026", adminHash, "Main Admin", primary.id
+    );
+    for (const extra of superAdmins.slice(1)) {
+      db.prepare("DELETE FROM users WHERE id = ?").run(extra.id);
+    }
+  } else {
+    ins.run("USR-ADMIN", "Sai_2026", adminHash, "Main Admin", "SUPER_ADMIN", null, null, null);
+  }
+  const client = db.prepare("SELECT id FROM users WHERE username = 'client' COLLATE NOCASE").get();
   if (client) {
-    for (const e of db.prepare("SELECT id FROM exams").all()) {
-      db.prepare("INSERT OR IGNORE INTO exam_clients (exam_id, user_id) VALUES (?,?)").run(e.id, client.id);
+    const bound = db.prepare("SELECT exam_id FROM exam_clients WHERE user_id = ?").all(client.id);
+    const allExams = db.prepare("SELECT id FROM exams").all();
+    const mixedAll = bound.length && allExams.length && bound.length >= allExams.length;
+    if (!bound.length || mixedAll) {
+      const exam = db.prepare("SELECT id FROM exams WHERE id = 'EXM-PILOT-2026'").get()
+        || db.prepare("SELECT id FROM exams ORDER BY exam_date LIMIT 1").get();
+      db.prepare("DELETE FROM exam_clients WHERE user_id = ?").run(client.id);
+      if (exam) db.prepare("INSERT OR IGNORE INTO exam_clients (exam_id, user_id) VALUES (?,?)").run(exam.id, client.id);
     }
   }
+  try {
+    const gate = db.prepare("SELECT id FROM users WHERE username = 'gate'").get();
+    const stf = db.prepare("SELECT id FROM staff WHERE id = 'STF-9002'").get();
+    if (gate && stf) db.prepare("UPDATE users SET staff_id = ? WHERE id = ?").run(stf.id, gate.id);
+    const cls = db.prepare("SELECT id FROM users WHERE username = 'classroom'").get();
+    if (cls && stf) {
+      /* classroom uses same centre; leave unlinked unless dedicated staff */
+    }
+    const asg = db.prepare("SELECT * FROM staff_assignments WHERE id = 'ASG-9002-PILOT'").get();
+    if (asg && stf && !db.prepare("SELECT id FROM boarding_passes WHERE staff_assignment_id = ? AND kind = 'STAFF_ID'").get(asg.id)) {
+      const { signPayload } = require("./token");
+      const passId = "SID-9002";
+      const payload = { typ: "STAFF_ID", passId, assignmentId: asg.id, staffId: stf.id, examId: asg.exam_id, centreId: asg.centre_id };
+      const token = signPayload(payload);
+      db.prepare(
+        `INSERT INTO boarding_passes (id, kind, staff_assignment_id, token, status, qr_payload) VALUES (?,?,?,?,?,?)`
+      ).run(passId, "STAFF_ID", asg.id, token, "ACTIVE", token);
+    }
+  } catch (_) { /* staff_id column or seed missing */ }
 }
 
 function makeId(prefix) {
@@ -559,6 +737,7 @@ async function openDb() {
   const db = wrapSql(raw, persistFn);
   createSchema(db);
   migrateMultiExam(db);
+  migrateSrsAdmin(db);
   seedIfEmpty(db);
   ensureAccounts(db);
   persistFn();

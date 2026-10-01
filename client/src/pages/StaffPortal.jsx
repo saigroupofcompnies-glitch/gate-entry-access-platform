@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import CameraCapture from "../CameraCapture.jsx";
 import FileSlot from "../FileSlot.jsx";
+import PublicChrome from "../PublicChrome.jsx";
 import { api } from "../api";
 
 const empty = {
@@ -76,33 +77,25 @@ export default function StaffPortal() {
 
   if (out) {
     return (
-      <div className="gov-shell">
-        <div className="gov-tricolor" />
-        <div className="gov-main">
-          <div className="panel otr-wide">
-            <p><Link to="/">← Public desk</Link></p>
-            <h2>Application received</h2>
-            <p>{out.message}</p>
-            <p>Reference <b className="mono">{out.staffId}</b></p>
-          </div>
+      <PublicChrome banner="/exam/staff-centre-desk.jpg" title="Centre staff" subtitle="Application received">
+        <div className="panel otr-wide dsx-panel">
+          <p><Link to="/">← Home</Link></p>
+          <h2>Application received</h2>
+          <p>{out.message}</p>
+          <p>Reference <b className="mono">{out.staffId}</b></p>
+          <p className="hint">After approval, sign in on Login → Staff with the issued User ID. You can download your identity card and staff gate pass from that portal.</p>
         </div>
-      </div>
+      </PublicChrome>
     );
   }
 
   return (
-    <div className="gov-shell">
-      <div className="gov-tricolor" />
-      <header className="gov-masthead compact">
-        <div className="gov-emblem"><b>EIALM</b></div>
-        <div>
-          <p className="gov-dept">Centre duty enrolment</p>
-          <p className="gov-sub">Staff and Incharge — not student OTR</p>
-        </div>
-      </header>
-      <main className="gov-main">
-        <div className="panel otr-wide">
-          <p><Link to="/">← Public desk</Link></p>
+    <PublicChrome
+      banner="/exam/staff-centre-desk.jpg"
+      title="Centre staff"
+      subtitle="Staff and centre incharge registration for exam-day duty."
+    >
+      <div className="panel otr-wide dsx-panel">
           <h2>{form.kind === "INCHARGE" ? "Centre Incharge application" : "Centre staff application"}</h2>
           <p className="hint">
             {form.kind === "INCHARGE"
@@ -261,7 +254,6 @@ export default function StaffPortal() {
             <button className="btn" type="submit" style={{ marginTop: 16 }}>Submit duty enrolment</button>
           </form>
         </div>
-      </main>
-    </div>
+    </PublicChrome>
   );
 }
